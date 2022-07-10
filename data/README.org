@@ -1,0 +1,21 @@
+* Data 
+The input data used for the experiments. 
+** Traces
+The traces collected with the Score-P tool. 
+|--------------------------+--------------------------------------------------------------------------------------------------|
+| File                     | Description                                                                                      |
+|--------------------------+--------------------------------------------------------------------------------------------------|
+| ./traces_raw.csv.gz      | The raw trace exported from the otf2csv tool. The trace.exec column identifies the 4 executions. |
+| ./traces_enriched.csv.gz | The traces with some handling applied to the collected parameters.                               |
+| ./mean_trace.csv         | The mean trace calculated from the 4 executions. Details on section 3 (Methodology).             |
+|--------------------------+--------------------------------------------------------------------------------------------------|
+** Additional data 
+|--------------------+--------------------------------------------------------------------------------|
+| File               | Description                                                                    |
+|--------------------+--------------------------------------------------------------------------------|
+| ./initial_mesh.csv | The triangles present at the  resistivity mesh used as input for the MARE2DEM. |
+| ./rx.csv           | The Receivers used at the CSEM data acquisition.                               |
+| ./tx.csv           | The Transmitters used at the CSEM data acquisition.                            |
+| ./comb.csv         | The refinement groups and Rx-Tx pairs count.                                   |
+|--------------------+--------------------------------------------------------------------------------|
+

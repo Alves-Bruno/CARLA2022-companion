@@ -1,0 +1,26 @@
+* Introduction - Companion
+
+Companion for the paper "Towards parameter-based profling for MARE2DEM performance modeling" by Bruno da Silva Alves, Luciano Paschoal Gaspary, and Lucas Mello Schnorr. 
+
+The paper was submitted to [[http://www.carla22.org/][CARLA 2022]].
+
+* Repository structure 
+ 
+[[./data]] -> The input files used on the paper experiments.
+[[./images]] -> The images showed on the paper.
+[[./scripts]] -> R scripts to create the images.
+
+* Scripts requirements
+
+This companion material is written in the R programming language, and
+all the scripts make heavy use of the tidyverse. In order to reproduce
+the work contained in this repository, the following libraries should
+be installed:
+
+#+begin_src R 
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+library(viridis)
+#+end_src
+
