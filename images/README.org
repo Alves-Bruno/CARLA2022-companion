@@ -1,0 +1,14 @@
+* Scripts table 
+|-------------+-----------------------+------------------------|
+| Description | Script                | Image                  |
+|-------------+-----------------------+------------------------|
+| Figure 2    | [[../scripts/figure_2.R]] | [[./figure_2.png]]         |
+| Figure 4    | [[../scripts/figure_4.R]] | [[./figure_4.png]]         |
+| Figure 5    | [[../scripts/figure_5.R]] | [[./images/figure_5.png]]  |
+| Figure 6    | [[../scripts/figure_6.R]] | [[./figure_6.png]]         |
+| Figure 7    | [[../scripts/figure_7.R]] | [[./figure_7.png]]         |
+| Figure 8    | [[../scripts/figure_8.R]] | [[./figure_8.png]]         |
+| Figure 9    | [[../scripts/figure_9.R]] | [[./figure_9.png]]         |
+|-------------+-----------------------+------------------------|
+| Table I     | [[table_1.R]]             | --                     |
+|-------------+-----------------------+------------------------|

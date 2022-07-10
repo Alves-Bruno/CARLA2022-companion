@@ -1,0 +1,873 @@
+* Scripts table 
+|-------------+------------+------------------------|
+| Description | Script     | Image                  |
+|-------------+------------+------------------------|
+| Figure 2    | [[figure_2.R]] | [[../images/figure_2.png]] |
+| Figure 4    | [[figure_4.R]] | [[../images/figure_4.png]] |
+| Figure 5    | [[figure_5.R]] | [[../images/figure_5.png]] |
+| Figure 6    | [[figure_6.R]] | [[../images/figure_6.png]] |
+| Figure 7    | [[figure_7.R]] | [[../images/figure_7.png]] |
+| Figure 8    | [[figure_8.R]] | [[../images/figure_8.png]] |
+| Figure 9    | [[figure_9.R]] | [[../images/figure_9.png]] |
+|-------------+------------+------------------------|
+| Table I     | [[table_1.R]]  | --                     |
+|-------------+------------+------------------------|
+* Background
+** Initial mesh
+#+begin_src R :results output :tangle scripts/figure_2.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+library(viridis)
+
+# Load data 
+read_csv("../data/tx.csv", progress=FALSE, show_col_types = FALSE) %>%
+  as_tibble() %>% 
+  mutate(tx=row_number())  -> tx
+
+read_csv("../data/rx.csv", progress=FALSE, show_col_types = FALSE) %>%
+  as_tibble() %>% 
+  mutate(rx=row_number()) -> rx
+
+read_csv("../data/initial_mesh.csv", progress=FALSE, show_col_types = FALSE) %>%
+  as_tibble() -> initial_mesh
+
+rx %>% select(id=rx, pos.x=Inline, pos.y=Z) -> recv
+tx %>% select(id=tx, pos.x=Inline, pos.y=Z) -> trans
+
+shapes <- c(20, 17)
+names(shapes) <- c("Tx", "Rx")
+
+initial_mesh %>% 
+    mutate(rho=log(rho)) %>%
+    ggplot() +
+    geom_polygon(aes(group = triangles, x = Y, y = -Z), size=.01, fill="white", color="black") +
+    # Plot Tx, Rx
+    geom_point(data=trans, aes(x=pos.x, y=-pos.y, shape="Tx"), color="blue") + 
+    geom_point(data=recv, aes(x=pos.x, y=-pos.y, shape="Rx"), color="red") +  
+    scale_shape_manual(values=shapes) +
+    labs(
+      title="A) Inline 04Tx013a area", 
+      y="Height (m)", x="Length (m)"
+      ) +
+    coord_cartesian(ylim=c(-6e3, 1000), xlim=c(-10e3, 52e3)) + 
+    theme_bw(base_size=20) +
+    theme(
+      panel.grid.major = element_blank(), 
+      panel.grid.minor = element_blank(),
+      legend.position="none"
+    ) -> a
+
+a + 
+geom_rect(data=tibble(), aes(xmin=-1e3, xmax=42e3, ymin=-200, ymax=-2e3), alpha=.3, color="black", fill="gray") +
+geom_text(data=tibble(), aes(x=39e3, y=500, label="Rx/Tx area"), size=5) -> p.a
+
+initial_mesh %>% 
+    ggplot() +
+    geom_polygon(aes(group = triangles, x = Y, y = -Z), size=.01, fill="white", color="grey50") +
+    # Plot Tx, Rx
+    geom_point(data=trans, aes(x=pos.x, y=-pos.y, shape="Tx"), color="blue", size=3) + 
+    geom_point(data=recv, aes(x=pos.x, y=-pos.y, shape="Rx"), color="red", size=8) + 
+    geom_text(data=recv, aes(x=pos.x, y=-pos.y, label=id), size=4.5) + 
+    geom_text(data=trans %>% filter(id %in% c(seq(0,206, 10))), aes(x=pos.x, y=-pos.y+60, label=id), size=5) + 
+    guides(shape = guide_legend(override.aes = list(colour = "black"))) + 
+    scale_shape_manual(values=shapes) +
+    labs(title="B) Zoom into the Rx/Tx area", y="Height (m)", x="Length (m)") +
+#    xlim(0 - 12e3, 42e3 + 11e3) + ylim(-6e3, 0) + 
+    coord_cartesian(
+      ylim=c(-1.6e3, -400),
+      xlim=c(1.5e3, 39.5e3)
+    ) +
+    theme_bw(base_size=20) +
+    theme(
+      panel.grid.major = element_blank(), 
+      panel.grid.minor = element_blank(),
+      legend.position="none"
+    ) -> p.b
+
+p.a + p.b + plot_layout(heights = c(1, 4), ncol=1) -> p 
+
+ggsave(
+  dpi = 100,
+  filename="figure_2.png",
+  plot = p,
+  #path = "~/Documents/2022/CMP223/artigo_final/evaluation/images",
+  path = "../images",
+  width = 15,
+  height = 10
+)
+
+
+    #+end_src
+
+    #+RESULTS:
+    : Error: '../data/tx.csv' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
+    : Error: '../data/rx.csv' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
+    : Error: '../data/initial_mesh.csv' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
+    : Error in grDevices::pdf(file = filename, ..., version = version) : 
+    :   cannot open file '../images/figure_2.png'
+** Stack view
+**** Iterations
+#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/traces_raw.csv.gz", progress=FALSE) -> traces.raw
+read_csv("../data/traces_enriched.csv.gz", progress=FALSE) -> traces.enriched
+
+# MANAGER OPERATIONS:
+#1 mpi_manager_send_subset    
+#2 mpi_manager_receive_results
+#3 jacobianCompute            
+#4 smoothingOccam             
+#5 Occam                      
+#6 iteration
+
+traces.raw %>% 
+  filter(trace.exec==1, Rank==0) %>%
+  select(Operation, Start, End, Imbrication) %>% 
+#  filter(Operation %in% c("iteration", "jacobianCompute", "smoothingOccam")) %>% 
+  filter(Operation %in% c("iteration")) %>% 
+  group_by(Operation) %>% 
+  mutate(Repeat=row_number()) -> iterations
+
+X.min <- 1700
+X.max <- 2450
+base.size <- 20
+iterations %>% 
+  ggplot()+
+  geom_rect(
+    aes(
+      xmin=Start, xmax=End,
+      ymin=0, ymax=1, 
+#      fill=
+    ), color="black", fill="gray"
+  ) + 
+  geom_text(aes(x=Start + (End-Start)/2, y=0.5, label=Repeat), size=5) + 
+#  geom_point()+
+#  labs(x="x",y="y")+
+#  ylim(0, 1) + 
+  coord_cartesian(xlim=c(X.min, X.max), ylim=c(0.04, 0.96)) +
+  facet_wrap(~"Iteration") + 
+  theme_bw(base_size=base.size) +
+  theme(
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(), 
+    axis.title.x = element_blank(),
+
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), 
+    axis.title.y = element_blank(),
+
+    plot.margin = margin(0, 0, 0.1, 0, "cm")
+  ) -> plot.it
+
+plot.it
+#+end_src
+
+#+RESULTS:
+: Error: '../data/traces_raw.csv.gz' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
+: Error: '../data/traces_enriched.csv.gz' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
+
+**** Phases
+#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+traces.raw %>% 
+  filter(trace.exec==1, Rank==0) %>%
+  select(Operation, Start, End, Imbrication) %>% 
+  filter(Operation %in% c("jacobianCompute", "smoothingOccam")) %>% 
+  mutate(Operation=gsub("jacobianCompute", "Jacobian", Operation)) %>% 
+  mutate(Operation=gsub("smoothingOccam", "Smoothing", Operation)) %>% 
+  group_by(Operation) %>% 
+  mutate(Repeat=row_number()) -> phases
+
+phases %>% 
+  filter(Repeat==3) %>%
+  ggplot()+
+  geom_rect(
+    aes(
+      xmin=Start, xmax=End,
+      ymin=0, ymax=1, 
+      fill=Operation
+    ), color="black"
+  ) + 
+  geom_text(aes(x=Start + (End-Start)/2, y=0.5, label=Operation), size=5) + 
+  coord_cartesian(xlim=c(X.min, X.max), ylim=c(0.04, 0.96)) + 
+  facet_wrap(~"Phases") + 
+  theme_bw(base_size=base.size) +
+  theme(
+    legend.position="none",
+
+    axis.text.x = element_blank(),
+    axis.ticks.x = element_blank(), 
+    axis.title.x = element_blank(),
+
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(), 
+    axis.title.y = element_blank(),
+
+    plot.margin = margin(0, 0, .1, 0, "cm")
+  ) -> plot.phase
+
+plot.phase
+
+#+end_src
+
+#+RESULTS:
+[[file:~/R-images/image-Phases.png]]
+**** Ref Groups
+#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+#1 mpi_worker_run_subset 
+#2 em2dkx_localRefinement
+#3 em2dkx_iteration      
+#4 lhs_gen               
+#5 primal_solve          
+#6 error_estimate        
+#7 derivs_comp_adj       
+#x <- seq(0, 1, length.out = 25)
+#show_col(seq_gradient_pal()(x))
+
+traces.enriched %>%
+  filter(
+    trace.exec==1, 
+    Operation=="mpi_worker_run_subset", 
+    Iteration==3) %>%
+  filter(Rank <= 25)-> temp 
+
+temp %>%
+  select(Group, everything()) %>%
+  print() %>%
+  ggplot()+
+  geom_rect(
+    aes(
+      xmin=Start, xmax=End,
+      ymin=Rank -.4, ymax=Rank +.4, 
+      fill=RefGroup1
+    ), color="black", size=.4, alpha=.5
+  ) + 
+  geom_text(data=temp, aes(x=Start + (End-Start)/2, y=Rank, label=RefGroup1), size=4) + 
+  scale_fill_gradientn(colours = heat.colors(3)) +
+  coord_cartesian(xlim=c(X.min, X.max)) + #, ylim=c(1,15)) + 
+  facet_wrap(~"Refinement Groups") + 
+  labs(y="Rank [id]", x= "Time [seconds]") +
+  theme_bw(base_size=base.size+1) +
+  scale_y_continuous(breaks=seq(1, 25, 2), labels=seq(1, 25, 2)) + 
+  theme(
+    legend.position="none",
+
+#    axis.text.x = element_blank(),
+#    axis.ticks.x = element_blank(), 
+#    axis.title.x = element_blank(),
+
+#    axis.text.y = element_blank(),
+#    axis.ticks.y = element_blank(), 
+#    axis.title.y = element_blank(),
+
+    plot.margin = margin(0, 0, 0, 0, "cm"),
+
+#    panel.grid.major = element_blank(),
+    panel.grid.minor = element_blank()
+  ) -> plot.groups
+
+plot.groups
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-Ref_Groups.png]]
+**** Final graph
+#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+
+#plot.it + 
+plot.phase + plot.groups + plot_layout(height=c(1, 8),ncol=1) -> p 
+
+ggsave(
+  dpi = 100,
+  filename="figure_4.png",
+  plot = p,
+  #path = "~/Documents/2022/CMP223/artigo_final/evaluation/images",
+  path = "../images",
+  width = 12,
+  height = 8
+)
+
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-Final_graph.png]]
+
+** Refinement Groups 
+#+begin_src R :results output :tangle scripts/figure_5.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/comb.csv", progress=FALSE, show_col_types = FALSE, col_types="iiiiii") -> comb
+
+tibble(
+  freq.name=c(0.125, 0.250, 0.500, 0.750,  1.00,  1.25)
+) %>% 
+  mutate(freq=row_number()) %>% 
+  mutate(freq.name=paste(sprintf("%.3f",freq.name), "Hz")) -> hz 
+
+comb %>% 
+#  print %>% 
+  left_join(hz, by = "freq") %>%
+  ggplot(aes(x=Group,y=RxTx.pairs, color=as.factor(freq.name)))+
+  geom_point(size=2)+
+#  geom_line()+
+#  geom_smooth(alpha=.1)+
+  labs(x="Refinement Groups [id]",y="Rx-Tx Pairs [count]", color="Frequencies")+
+  theme_bw(base_size=20) -> p 
+
+#p
+#dev.off()
+ggsave(
+  dpi = 100,
+ filename="figure_5.png",
+ plot = p,
+ #path = "~/Documents/2022/CMP223/artigo_final/evaluation/images",
+ path = "../images",
+ width = 8,
+ height = 5
+)
+
+#0.125–1.25
+# 0.125Hz 0.350 0.575 0.800 1.025 1.250
+
+#p
+#+end_src
+
+#+RESULTS:
+[[file:~/R-images/image-Refinement_Groups.png]]
+
+* Results 
+** Stack view
+#+begin_src R :results output :tangle scripts/figure_6.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/traces_enriched.csv.gz", progress=FALSE) -> traces.enriched
+
+base.size <- 16
+
+op <- c("em2dkx_localRefinement", "lhs_gen", "primal_solve", "error_estimate", "derivs_comp_adj")
+
+traces.enriched %>% 
+  select(-Group) %>% 
+  rename(Group=RefGroup2) %>%
+  filter(trace.exec==1, Iteration==3, Rank==7, Group==7) %>%
+  filter(Operation %in% op) -> temp 
+
+tibble(
+  start = seq(1, 30, 5),
+  end = seq(5, 31, 5)
+) %>% 
+#  print() %>% 
+  mutate(Subset.id = row_number()) %>% 
+  pivot_longer(cols=c("start", "end"), values_to="iSubset") %>%  
+  select(-name) -> sub.id
+
+temp %>% 
+  group_by(Phase) %>%
+  summarize(Start=min(Start), End=max(End)) %>%
+  mutate(Operation="Group Refinement", Group=7) -> op.group
+
+
+temp %>%
+  left_join(sub.id, by = "iSubset") %>%
+  group_by(Subset.id, Phase, Rank) %>%
+  summarize(Start=min(Start), End=max(End)) %>%
+  filter(!is.na(Subset.id)) %>%
+  mutate(Operation="Subset Processing") -> op.subset
+
+tibble(
+  Operation=c(op, "Subset Processing", "Group Refinement"), 
+  y=c(2, 1, 1, 1, 1, 3, 4)
+) -> yvalues
+
+bind_rows(
+  temp %>% 
+    select(Phase, Start, End, Operation), 
+  bind_rows(op.subset %>% select(-Rank), op.group)
+) %>% 
+  left_join(yvalues) %>% 
+  mutate(Operation=gsub("em2dkx_localRefinement", "local_refinement", Operation))-> temp.2
+
+
+stack_plot <- function(df, phase){
+
+df %>% 
+  filter(Phase==phase) %>%
+  mutate(Phase=gsub("jacobianCompute", "Jacobian", Phase)) %>% 
+  mutate(Phase=gsub("smoothingOccam", "Smoothing", Phase)) -> temp.3
+
+temp.3 %>%
+  ggplot()+
+  geom_rect(
+    aes(
+      xmin=Start, xmax=End,
+      ymin=y -.4, ymax=y +.4, 
+      fill=Operation
+    ), color="black", size=.2, alpha=.8
+  ) + 
+  scale_fill_manual(breaks = c("Group Refinement", "Subset Processing", "local_refinement", "derivs_comp_adj", "error_estimate", "lhs_gen", "primal_solve"), 
+                       values=c("#E41A1C","#FF7F00","#377EB8","#F781BF","#4DAF4A","#FFFF33","#A65628","#F781BF")) + 
+
+  geom_text(data= temp.3 %>% filter(Operation=="Group Refinement"), aes(x=Start + (End-Start)/2, y=4, label=Group), size=5.5) + 
+  geom_text(data= temp.3 %>% filter(Operation=="Subset Processing"), aes(x=Start + (End-Start)/2, y=3, label=paste((Subset.id-1)*5+1,(Subset.id)*5,sep=" - ")), size=4) + 
+  labs(y="Stack Level", x= "Time [seconds]") +
+  theme_bw(base_size=base.size) +
+  scale_x_continuous(expand = c(0.01, 0.01)) +
+  facet_wrap(~Phase) 
+}
+
+a <- stack_plot(temp.2, "jacobianCompute") + 
+theme(
+  legend.position="top",
+  axis.title.x = element_blank(),
+  axis.text.y = element_blank(),
+  axis.ticks.y = element_blank(), 
+  plot.margin = margin(0, .5, 0, .5, "cm"),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank()
+)
+
+b <- stack_plot(temp.2, "smoothingOccam") +
+theme(
+  legend.position="none",
+  axis.text.y = element_blank(),
+  axis.ticks.y = element_blank(), 
+  plot.margin = margin(0, .5, 0, .5, "cm"),
+  panel.grid.major = element_blank(),
+  panel.grid.minor = element_blank()
+)
+
+p <- a / b
+
+ggsave(
+  dpi = 100,
+  filename="figure_6.png",
+  plot = p,
+  path = "../images",
+  width = 10,
+  height = 6
+)
+#+end_src
+
+#+RESULTS:
+[[file:~/R-images/image-Stack_view.png]]
+
+** Microkernel's impact on MARE2DEM performance - TABLE
+#+begin_src R :tangle scripts/table_1.R :results table :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+
+mean_trace %>% 
+  pull(Duration.mean) %>% 
+  sum() -> total.time
+
+mean_trace %>% 
+  group_by(Operation) %>%  
+  summarize(
+    instances = n(),
+    Op.time = sum(Duration.mean), 
+    Op.time.min = min(Duration.mean), 
+    Op.time.mean = mean(Duration.mean),
+    Op.time.max = max(Duration.mean)
+) %>%
+  mutate(relative_time=100*(Op.time/total.time)) %>%
+  arrange(relative_time) -> table
+
+table %>% 
+  ungroup() %>%
+  summarize(
+    instances=sum(instances),
+    relative_time=sum(relative_time)
+  ) %>% 
+  mutate(
+    Operation = "Total", 
+    Op.time = 0,
+    Op.time.min = 0,
+    Op.time.mean = 0,
+    Op.time.max = 0
+  ) -> table.total
+
+bind_rows(table, table.total) %>%
+  arrange(relative_time) %>% 
+  mutate(relative_time = sprintf("%.2f%%", relative_time)) %>%
+  mutate(instances=sprintf("%.1fK", instances/1000)) %>%
+  mutate(Op.time.min=sprintf("%.2fs", Op.time.min)) %>%
+  mutate(Op.time.mean=sprintf("%.2fs", Op.time.mean)) %>%
+  mutate(Op.time.max=sprintf("%.2fs", Op.time.max)) %>%
+  select(Operation, instances, relative_time, Op.time.min, Op.time.mean, Op.time.max) %>% 
+  as.data.frame
+
+#+end_src
+
+#+RESULTS:
+| local_refinement | 43.3K  |   3.14% | 0.26s | 0.81s | 1.77s  |
+| lhs_gen          | 304.1K |   3.86% | 0.03s | 0.14s | 0.66s  |
+| derivs_comp_adj  | 45.6K  |  11.11% | 0.03s | 2.72s | 19.01s |
+| error_estimate   | 105.3K |  33.72% | 0.19s | 3.57s | 14.42s |
+| primal_solve     | 304.1K |  48.16% | 0.20s | 1.77s | 8.41s  |
+| Total            | 802.4K | 100.00% | 0.00s | 0.00s | 0.00s  |
+
+** Microkernel's duration in function of nodes and pairs
+*** derivs_comp_adj
+#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+
+n_pairs <- mean_trace %>% pull(RxTx.pairs) %>% max()
+div.step=20
+tibble(
+  pairs.group=rep(1:ceiling(n_pairs/div.step), each=div.step, times=1)
+) %>% 
+  mutate(RxTx.pairs=row_number()) %>% 
+  filter(RxTx.pairs<=n_pairs) -> pairs.groups
+
+pairs.groups %>% 
+  group_by(pairs.group) %>% 
+  summarize(pairs.min=min(RxTx.pairs), pairs.max=max(RxTx.pairs)) %>% 
+  mutate(pairs.name=paste(sprintf("%.2d", pairs.min), pairs.max, sep=" - ")) %>% 
+  pull(pairs.name) -> pairs.legend
+
+mean_trace %>% 
+  left_join(pairs.groups, by = "RxTx.pairs") -> trace.pairs
+
+trace.pairs %>%
+  filter(Operation=="derivs_comp_adj", Phase=="Jacobian") %>% 
+  ggplot(aes(x=NodesFrom/1000, y=Duration.mean, colour=as.factor(pairs.group))) + 
+  geom_point(alpha=.01) + 
+  geom_smooth(alpha=.1, method="lm") + 
+  scale_colour_discrete(labels = pairs.legend) + 
+  theme_bw(base_size=16) + 
+  labs(x="Processed Nodes [K]", y="Mean Duration [s]", colour="Rx-Tx pairs") + 
+#  ylim(c(0, 25)) + xlim(c(0, 175)) + 
+#  theme(legend.position="node") + 
+  facet_wrap(~Operation) -> derivs 
+
+derivs
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-derivs_comp_adj.png]]
+
+*** Other microkernels
+#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+mean_trace %>% 
+  filter(Operation %in% c("error_estimate", "lhs_gen", "primal_solve")) %>% 
+  ggplot(aes(x=NodesFrom/1000, y=Duration.mean)) + 
+  geom_point(alpha=.01) + 
+  geom_smooth(method="lm") + 
+  theme_bw(base_size=16) + 
+  labs(x="Processed Nodes [K]", y="Mean Duration [s]") +
+#  ylim(c(0, 25)) + xlim(c(0, 175)) + 
+#  theme(legend.position="node") + 
+  facet_wrap(~Operation, scale="free_y") -> others
+
+others
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-Other_microkernels.png]]
+
+*** derivs and the others
+#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+
+p <- others + derivs + plot_layout(widths=c(3,1))
+
+ggsave(
+  dpi = 100,
+  filename="figure_7.png",
+  plot = p,
+  path = "../images/",
+  width = 12,
+  height = 4
+)
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-derivs_and_the_others.png]]
+
+** Iteration's duration 
+*** Build dataframe
+#+begin_src R :results output :tangle scripts/figure_8.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/traces_raw.csv.gz", progress=FALSE) -> traces.raw
+read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+
+traces.raw %>% 
+  filter(Operation == "iteration") %>% 
+  mutate(Duration = End - Start) %>%  
+  group_by(trace.exec) %>%  
+  mutate(Iteration = row_number()) %>%  
+  group_by(Iteration) %>%
+  summarize(
+    Duration.mean=mean(Duration), 
+    Duration.se=3*sd(Duration)/sqrt(n())  
+  ) %>% 
+  print -> iterations.duration
+
+traces.raw %>% 
+#  filter(Rank==0) %>% select(Operation) %>% distinct()
+  filter(Operation %in% c("jacobianCompute", "smoothingOccam")) %>% 
+  mutate(Phase=Operation) %>%
+  mutate(Phase=gsub("jacobianCompute", "Jacobian", Phase)) %>% 
+  mutate(Phase=gsub("smoothingOccam", "Smoothing", Phase)) %>%
+  mutate(Duration = End - Start) %>%  
+  group_by(trace.exec, Phase) %>%  
+  mutate(Iteration = row_number()) %>%  
+  group_by(Iteration, Phase) %>%
+  summarize(Duration.mean=mean(Duration),     Duration.se=3*sd(Duration)/sqrt(n())  ) %>%
+  print -> iterations.phases.duration
+#  select(trace.exec, Duration, Operation)
+
+mean_trace %>% 
+  ungroup() %>%
+  filter(Operation!="local_refinement") %>% 
+  group_by(Iteration, Phase) %>%
+  summarize(processed_nodes=sum(NodesFrom)) -> p_nodes
+  
+mean_trace %>% 
+  select(Iteration, Phase, Repetition) %>% 
+  distinct() %>% 
+  group_by(Iteration, Phase) %>% 
+  summarize(Repetition = n()) %>%
+  print(n=nrow(.)) -> repetitions
+#+end_src
+
+#+RESULTS:
+#+begin_example
+# A tibble: 8 x 3
+  Iteration Duration.mean Duration.se
+      <int>         <dbl>       <dbl>
+1         1          815.        3.75
+2         2          852.        8.02
+3         3          806.        4.71
+4         4         1099.        9.11
+5         5         3742.        6.88
+6         6         3569.       13.4 
+7         7         3533.        6.57
+8         8         4081.        5.72
+`summarise()` has grouped output by 'Iteration'. You can override
+using the `.groups` argument.
+# A tibble: 16 x 4
+# Groups:   Iteration [8]
+   Iteration Phase     Duration.mean Duration.se
+       <int> <chr>             <dbl>       <dbl>
+ 1         1 Jacobian           508.        1.81
+ 2         1 Smoothing          307.        2.58
+ 3         2 Jacobian           585.        6.47
+ 4         2 Smoothing          267.        1.62
+ 5         3 Jacobian           567.        3.52
+ 6         3 Smoothing          238.        1.16
+ 7         4 Jacobian           492.        3.81
+ 8         4 Smoothing          607.        5.82
+ 9         5 Jacobian           640.        2.20
+10         5 Smoothing         3102.        5.01
+11         6 Jacobian           912.       10.4 
+12         6 Smoothing         2656.        8.30
+13         7 Jacobian           833.        2.60
+14         7 Smoothing         2700.        4.75
+15         8 Jacobian           834.        1.77
+16         8 Smoothing         3246.        7.02
+`summarise()` has grouped output by 'Iteration'. You can override
+using the `.groups` argument.
+`summarise()` has grouped output by 'Iteration'. You can override
+using the `.groups` argument.
+# A tibble: 16 x 3
+# Groups:   Iteration [8]
+   Iteration Phase     Repetition
+       <dbl> <chr>          <int>
+ 1         1 Jacobian           1
+ 2         1 Smoothing          1
+ 3         2 Jacobian           1
+ 4         2 Smoothing          1
+ 5         3 Jacobian           1
+ 6         3 Smoothing          1
+ 7         4 Jacobian           1
+ 8         4 Smoothing          2
+ 9         5 Jacobian           1
+10         5 Smoothing          6
+11         6 Jacobian           1
+12         6 Smoothing          6
+13         7 Jacobian           1
+14         7 Smoothing          6
+15         8 Jacobian           1
+16         8 Smoothing          7
+#+end_example
+
+*** Iteration plot
+#+begin_src R :results output :tangle scripts/figure_8.R :exports both :session *R-local*
+
+iterations.phases.duration %>% 
+  left_join(repetitions, by = c("Iteration", "Phase")) %>%
+  ggplot()+
+  geom_point(aes(x=Iteration,y=Duration.mean, colour=Phase))+
+  geom_line(aes(x=Iteration,y=Duration.mean, colour=Phase))+
+  geom_text(data=. %>% filter(Phase=="Smoothing",Iteration!=4), aes(x=Iteration, y=Duration.mean+100, label=Repetition))+
+  ## geom_text(
+  ##   data=. %>% filter(Iteration==4, Phase=="Jacobian"), 
+  ##   aes(x=Iteration, y=Duration.mean-100, label=Repetition)
+  ## )+
+  geom_text(
+    data=. %>% filter(Iteration==4, Phase=="Smoothing"), 
+    aes(x=Iteration-.17, y=Duration.mean+100, label=Repetition)
+  )+
+  geom_errorbar(aes(x=Iteration, y=Duration.mean, ymin=Duration.mean-Duration.se, ymax=Duration.mean+Duration.se), width=.3)+
+  ylim(0, NA)+
+  theme_bw(base_size=16) +
+  labs(x="Iteration", y="Mean Duration [s]")+
+  theme(
+    legend.margin = margin(0, 0, 0, 0), 
+    legend.position="top", 
+    plot.margin = margin(0, .5, 0, 0, "cm")
+  ) -> a
+
+iterations.phases.duration %>% 
+  left_join(p_nodes, by = c("Iteration", "Phase")) %>%
+  ggplot(aes(x=processed_nodes/ 1000000,y=Duration.mean, colour=Phase))+
+  geom_point()+
+  geom_line()+
+  geom_rect(aes(xmin=600, xmax=1400, ymin=400, ymax=1000), color="grey40", alpha=0, size=.1)+
+  geom_text(data=tibble(), aes(x=900, y=1300, label="Zoom"), color="black")+
+  ylim(0, NA)+
+  theme_bw(base_size=16) +
+#  facet_wrap(~"Smoothing limited axis")+
+  labs(x="Iteration", y="Mean \nDuration [s]")+
+  theme(legend.position="none", axis.title.x=element_blank()) -> b
+
+iterations.phases.duration %>% 
+  left_join(p_nodes, by = c("Iteration", "Phase")) %>%
+  ggplot(aes(x=processed_nodes / 1000000,y=Duration.mean, colour=Phase))+
+  geom_point()+
+  geom_line()+
+  ylim(0, NA)+
+  coord_cartesian(xlim=c(720,1320), ylim=c(480, 920))+
+  facet_wrap(~"Zoom into Jacobian")+
+  theme_bw(base_size=16)+
+  labs(x="Processed nodes x 1M", y="Mean \nDuration [s]")+
+  theme(legend.position="none") -> c
+
+
+p <- a + (b / c)
+
+ggsave(
+  dpi = 100,
+  filename="figure_8.png",
+  plot = p,
+  #path = "~/Documents/2022/CMP223/artigo_final/evaluation/images",
+  path = "../images",
+  width = 10,
+  height = 5.5
+)
+
+#p
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-Iteration_plot.png]]
+
+** Refinement groups signature
+#+begin_src R :results output :tangle scripts/figure_9.R :exports both :session *R-local*
+options(crayon.enabled=FALSE)
+library(tidyverse) 
+library(patchwork)
+
+read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/comb.csv", progress=FALSE, show_col_types = FALSE, col_types="iiiiii") -> comb
+
+tibble(
+  freq_value=c(0.125, 0.250, 0.500, 0.750,  1.00,  1.25)
+) %>% 
+  mutate(freq=row_number()) %>% 
+  mutate(freq_value=paste(sprintf("%.3f",freq_value), "Hz")) -> hz 
+
+
+mean_trace %>% 
+  filter(!is.na(NodesFrom)) %>%
+  group_by(Group, Phase, Iteration) %>%
+  summarize(Nodes=sum(NodesFrom), Duration.mean=sum(Duration.mean)) -> temp
+
+temp %>% 
+  left_join(comb, by="Group") %>% 
+  left_join(hz, by="freq")%>%
+  filter(Iteration %in% c(5,6,7,8)) -> temp 
+
+temp %>%
+  filter(Phase=="Jacobian") %>%
+  ggplot(aes(x=Group,y=Duration.mean, colour=as.factor(freq_value)))+
+  geom_smooth(span=.3, alpha=.1)+
+  theme_bw(base_size=16) + 
+  ylim(0, NA) +
+  facet_wrap(~Phase) +
+  labs(y="Duration [s]")+ 
+  theme(
+    legend.position="none",
+  ) -> a
+
+temp %>%
+  filter(Phase=="Jacobian") %>%
+  ggplot(aes(x=Group,y=Nodes/10000, colour=as.factor(freq_value)))+
+  geom_smooth(span=.3, alpha=.1)+
+  theme_bw(base_size=16) + 
+  facet_wrap(~Phase) +
+  labs(y="Nodes [10K]")+
+  theme(
+    legend.position="none"
+  ) -> b
+
+temp %>%
+  filter(Phase=="Smoothing") %>%
+  ggplot(aes(x=Group,y=Duration.mean, colour=as.factor(freq_value)))+
+  geom_smooth(span=.3, alpha=.1)+
+  theme_bw(base_size=16) + 
+  ylim(0, NA) +
+  facet_wrap(~Phase)+ 
+  labs(colour="Frequencies")+
+  theme(
+    axis.title.y = element_blank()
+  )-> c
+
+temp %>%
+  filter(Phase=="Smoothing") %>%
+  ggplot(aes(x=Group,y=Nodes/10000, colour=as.factor(freq_value)))+
+  geom_smooth(span=.3, alpha=.1)+
+  theme_bw(base_size=16) + 
+  facet_wrap(~Phase) + 
+  labs(colour="Frequencies")+
+  theme(
+    axis.title.y = element_blank()
+  )-> d
+
+p <- a + c + b + d + plot_layout(nrow=2)
+
+#dev.off()
+ggsave(
+  dpi = 100,
+  filename="figure_9.png",
+  plot = p,
+  #path = "~/Documents/2022/CMP223/artigo_final/evaluation/images",
+  path = "../images",
+  width = 10,
+  height = 6
+)
+
+p
+
+#+end_src
+
+#+RESULTS:
+[[file:./temp/image-Refinement_groups_signature.png]]
+
