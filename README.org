@@ -5,11 +5,13 @@ Companion for the paper "Towards parameter-based profling for MARE2DEM performan
 The paper was submitted to [[http://www.carla22.org/][CARLA 2022]].
 
 * Repository structure 
- 
-[[./data]] -> The input files used on the paper experiments.
-[[./images]] -> The images showed on the paper.
-[[./scripts]] -> R scripts to create the images.
-
+|-----------+------------------------------------------------|
+| Folder    | Description                                    |
+|-----------+------------------------------------------------|
+| [[./data]]    | The input files used on the paper experiments. |
+| [[./images]]  | The images showed on the paper.                |
+| [[./scripts]] | R scripts to create the images.                |
+|-----------+------------------------------------------------|
 * Scripts requirements
 
 This companion material is written in the R programming language, and
