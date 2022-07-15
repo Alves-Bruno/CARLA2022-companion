@@ -2,7 +2,7 @@ options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 mean_trace %>% 
   pull(Duration.mean) %>% 
