@@ -2,7 +2,7 @@ options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 n_pairs <- mean_trace %>% pull(RxTx.pairs) %>% max()
 div.step=20

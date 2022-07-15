@@ -3,7 +3,7 @@ library(tidyverse)
 library(patchwork)
 
 read_csv("../data/traces_raw.csv.gz", progress=FALSE) -> traces.raw
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 traces.raw %>% 
   filter(Operation == "iteration") %>% 

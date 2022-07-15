@@ -14,7 +14,7 @@
 |-------------+------------+------------------------|
 * Background
 ** Initial mesh
-#+begin_src R :results output :tangle scripts/figure_2.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_2.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
@@ -108,7 +108,7 @@ ggsave(
     :   cannot open file '../images/figure_2.png'
 ** Stack view
 **** Iterations
-#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_4.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
@@ -171,7 +171,7 @@ plot.it
 : Error: '../data/traces_enriched.csv.gz' does not exist in current working directory ('/Users/brunoalves/Documents/2022/CARLA-companion').
 
 **** Phases
-#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_4.R :exports both :session *R-local*
 traces.raw %>% 
   filter(trace.exec==1, Rank==0) %>%
   select(Operation, Start, End, Imbrication) %>% 
@@ -216,7 +216,7 @@ plot.phase
 #+RESULTS:
 [[file:~/R-images/image-Phases.png]]
 **** Ref Groups
-#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_4.R :exports both :session *R-local*
 #1 mpi_worker_run_subset 
 #2 em2dkx_localRefinement
 #3 em2dkx_iteration      
@@ -275,7 +275,7 @@ plot.groups
 #+RESULTS:
 [[file:./temp/image-Ref_Groups.png]]
 **** Final graph
-#+begin_src R :results output :tangle scripts/figure_4.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_4.R :exports both :session *R-local*
 
 #plot.it + 
 plot.phase + plot.groups + plot_layout(height=c(1, 8),ncol=1) -> p 
@@ -296,7 +296,7 @@ ggsave(
 [[file:./temp/image-Final_graph.png]]
 
 ** Refinement Groups 
-#+begin_src R :results output :tangle scripts/figure_5.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_5.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
@@ -342,7 +342,7 @@ ggsave(
 
 * Results 
 ** Stack view
-#+begin_src R :results output :tangle scripts/figure_6.R :exports both :session *R-local*
+#+begin_src R :results output :tangle ./figure_6.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
@@ -459,12 +459,12 @@ ggsave(
 [[file:~/R-images/image-Stack_view.png]]
 
 ** Microkernel's impact on MARE2DEM performance - TABLE
-#+begin_src R :tangle scripts/table_1.R :results table :exports both :session *R-local*
+#+begin_src R :tangle ./table_1.R :results table :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 mean_trace %>% 
   pull(Duration.mean) %>% 
@@ -518,12 +518,12 @@ bind_rows(table, table.total) %>%
 
 ** Microkernel's duration in function of nodes and pairs
 *** derivs_comp_adj
-#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_7.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 n_pairs <- mean_trace %>% pull(RxTx.pairs) %>% max()
 div.step=20
@@ -561,7 +561,7 @@ derivs
 [[file:./temp/image-derivs_comp_adj.png]]
 
 *** Other microkernels
-#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_7.R :exports both :session *R-local*
 mean_trace %>% 
   filter(Operation %in% c("error_estimate", "lhs_gen", "primal_solve")) %>% 
   ggplot(aes(x=NodesFrom/1000, y=Duration.mean)) + 
@@ -580,7 +580,7 @@ others
 [[file:./temp/image-Other_microkernels.png]]
 
 *** derivs and the others
-#+begin_src R :results output :tangle scripts/figure_7.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_7.R :exports both :session *R-local*
 
 p <- others + derivs + plot_layout(widths=c(3,1))
 
@@ -599,13 +599,13 @@ ggsave(
 
 ** Iteration's duration 
 *** Build dataframe
-#+begin_src R :results output :tangle scripts/figure_8.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_8.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
 read_csv("../data/traces_raw.csv.gz", progress=FALSE) -> traces.raw
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 
 traces.raw %>% 
   filter(Operation == "iteration") %>% 
@@ -709,7 +709,7 @@ using the `.groups` argument.
 #+end_example
 
 *** Iteration plot
-#+begin_src R :results output :tangle scripts/figure_8.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_8.R :exports both :session *R-local*
 
 iterations.phases.duration %>% 
   left_join(repetitions, by = c("Iteration", "Phase")) %>%
@@ -780,12 +780,12 @@ ggsave(
 [[file:./temp/image-Iteration_plot.png]]
 
 ** Refinement groups signature
-#+begin_src R :results output :tangle scripts/figure_9.R :exports both :session *R-local*
+#+begin_src R :results output :tangle figure_9.R :exports both :session *R-local*
 options(crayon.enabled=FALSE)
 library(tidyverse) 
 library(patchwork)
 
-read_csv("../data/mean_trace.csv.gz", progress=FALSE) -> mean_trace
+read_csv("../data/mean_trace.csv", progress=FALSE) -> mean_trace
 read_csv("../data/comb.csv", progress=FALSE, show_col_types = FALSE, col_types="iiiiii") -> comb
 
 tibble(
